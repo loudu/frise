@@ -1,0 +1,1341 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mouvements sociaux en France</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Krona+One&family=Asap:wght@400;500&display=swap">
+<style>
+  /* Base identique à celle de la page principale */
+  :root { box-sizing: border-box; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+  body { margin: 0; }
+  img { max-width: 100%; }
+  [hidden] { display: none !important; }
+</style>
+<style>
+  /* Layout : frame Figma « Hist gauche » — fond noir, titres capitales larges, frise horizontale de bulles en zigzag, barre de défilement rouge */
+  :root {
+    --bg: #000;
+    --fg: #fff;
+    --muted: #b9b9b9;
+    --rail: #2a2a2a;
+    --panel-bg: rgba(8, 8, 10, .65); /* teinte du verre de la fenêtre « Détail » */
+    --glass-edge: rgba(255, 255, 255, .22);
+    --img-anar: linear-gradient(to bottom right, #ff0000 calc(50% - .5px), #000 calc(50% + .5px)); /* drapeau anarchiste rouge et noir */
+    --scroll-thumb: #fff;
+    --scroll-track: rgba(255, 255, 255, .12);
+    --bubble: #d9d9d9;
+    --red: #e10600;
+    --display: "Krona One", "Arial Black", Impact, sans-serif;
+    --body: "Asap", "Segoe UI", Helvetica, Arial, sans-serif;
+    --bubble-w: 157px;
+    --bubble-h: 144px;
+    --pitch: 210px;      /* écart horizontal entre deux bulles */
+    --drop: 64px;        /* décalage vertical du zigzag */
+    --text-w: 300px;
+    --edge: 205px;       /* marge haute / basse de la frise (texte des bulles extrêmes) */
+    --lane-gap: 120px;   /* espace entre deux branches */
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--body);
+    font-size: 15px;
+    line-height: 1.3;
+  }
+  .page {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding-block: 44px 64px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .inner { padding-inline: clamp(0px, 4.5vw, 73px); }
+
+  h1, h2 {
+    font-family: var(--display);
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    margin: 0;
+    text-wrap: balance;
+  }
+  /* Menu entre les frises */
+  .site-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 22px;
+    margin-bottom: 34px;
+    font-family: var(--display);
+    font-size: 11px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+  .site-nav a {
+    color: var(--muted);
+    text-decoration: none;
+    padding-bottom: 5px;
+    border-bottom: 3px solid transparent;
+    transition: color .2s ease, border-color .2s ease;
+  }
+  .site-nav a:hover { color: var(--fg); }
+  .site-nav a[aria-current="page"] { color: var(--fg); border-bottom-color: var(--red); }
+  .site-nav a:focus-visible { outline: 2px solid var(--fg); outline-offset: 4px; }
+
+  h1 {
+    display: grid;
+    gap: .9em;
+    font-size: clamp(15px, 1.45vw, 20px);
+    line-height: 1.2;
+  }
+  h1 .l1 { justify-self: center; transform: translateX(-4%); }
+  h1 .l2 { justify-self: end; margin-right: clamp(0px, 9vw, 130px); }
+  h2 { font-size: clamp(16px, 1.45vw, 20px); }
+  /* Titre de chapitre qui change au fil de la frise */
+  #chapter { transition: opacity .25s ease, transform .25s ease; }
+  #chapter.out { opacity: 0; transform: translateY(-8px); }
+  @media (prefers-reduced-motion: reduce) { #chapter { transition: none; } }
+
+  section { display: grid; gap: 14px; }
+  .welcome { margin-top: clamp(40px, 5vw, 72px); }
+  .welcome p { max-width: 62ch; margin: 0; }
+  .story { margin-top: clamp(40px, 5vw, 72px); gap: 0; min-width: 0; }
+  .hint { font-size: 13px; color: var(--muted); margin: 8px 0 0; }
+
+  /* Zone qui défile horizontalement */
+  .scroller {
+    margin-top: 16px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    overscroll-behavior-x: contain;
+    min-width: 0;
+  }
+  .scroller::-webkit-scrollbar { display: none; }
+  .scroller:focus-visible { outline: 2px solid var(--fg); outline-offset: 4px; }
+
+  .timeline {
+    position: relative;
+    /* une « voie » par branche, empilées verticalement */
+    --band: calc(var(--bubble-h) + var(--drop) + var(--lane-gap));
+    height: calc(var(--edge) * 2 + var(--band) * var(--tracks, 1) - var(--lane-gap));
+    width: 100%;
+    transition: width .3s ease, height .4s ease;
+    transform: scale(var(--z, 1));
+    transform-origin: 0 0;
+  }
+  .wire {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    overflow: visible;
+  }
+  .wire path { fill: none; stroke: var(--red); stroke-width: 6; stroke-linecap: round; }
+
+  .step {
+    position: absolute;
+    left: calc((var(--text-w) - var(--bubble-w)) / 2 + var(--n) * var(--pitch) + var(--dx, 0px));
+    top: calc(var(--edge) + var(--track, 0) * var(--band) + var(--row) * var(--drop));
+    width: var(--bubble-w);
+    height: var(--bubble-h);
+  }
+  .bubble {
+    width: var(--bubble-w);
+    height: var(--bubble-h);
+    border-radius: 50%;
+    overflow: hidden;
+    padding: 0;
+    /* Image de fond : remplacer --img par url("data:image/...") */
+    background-color: var(--bubble);
+    background-image:
+      linear-gradient(rgba(0,0,0,.25), rgba(0,0,0,.45)),
+      var(--img, repeating-linear-gradient(135deg, #cfcfcf 0 10px, #bdbdbd 10px 20px));
+    background-size: cover;
+    background-position: center;
+    border: 6px solid var(--red);
+    cursor: pointer;
+    position: relative;
+    z-index: 1;
+    transition: transform .2s ease, box-shadow .2s ease;
+    font-family: var(--display);
+  }
+  .bubble:hover { transform: scale(1.04); }
+  .bubble:focus-visible { outline: 3px solid var(--fg); outline-offset: 4px; }
+  .bubble[aria-expanded="true"] {
+    box-shadow: 0 0 0 10px rgba(225, 6, 0, .22);
+    background-image: linear-gradient(rgba(0,0,0,.05), rgba(0,0,0,.25)), var(--img, repeating-linear-gradient(135deg, #cfcfcf 0 10px, #bdbdbd 10px 20px));
+  }
+  /* Contenu de la bulle : date + court texte en dessous */
+  .bubble .face {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 4px;
+    padding: 0 14px;
+    color: #fff;
+    text-align: center;
+    text-shadow: 0 1px 6px rgba(0,0,0,.8);
+  }
+  .bubble .date {
+    font-size: clamp(14px, 1.3vw, 18px);
+    letter-spacing: .05em;
+    font-variant-numeric: tabular-nums;
+  }
+  .bubble .label {
+    font-family: var(--body);
+    font-weight: 500;
+    font-size: 12px;
+    line-height: 1.15;
+    text-wrap: balance;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  @media (max-width: 760px) {
+    .bubble .face { padding: 0 10px; gap: 2px; }
+    .bubble .label { font-size: 11px; }
+  }
+
+  /* Nom de la branche, posé sur la ligne rouge juste avant la 1re bulle de la branche */
+  .branch-tag {
+    position: absolute;
+    right: calc(100% + 12px);
+    bottom: calc(50% + 10px);
+    white-space: nowrap;
+    font-family: var(--display);
+    font-size: 11px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--fg);
+    background: var(--red);
+    padding: 3px 7px 2px;
+    border-radius: 2px;
+    z-index: 1;
+  }
+
+  /* Texte : au-dessus des bulles du haut, en dessous des bulles du bas */
+  .text {
+    position: absolute;
+    left: 50%;
+    width: var(--text-w);
+    margin-left: calc(var(--text-w) / -2);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity .3s ease, transform .3s ease, visibility 0s .3s;
+  }
+  .text p { margin: 0; font-size: 14px; line-height: 1.3; }
+  /* Bulle de dialogue rectangulaire en verre : flou + reflet, avec une pointe tournée vers la bulle */
+  .text > div {
+    position: relative;
+    padding: 14px 16px 16px;
+    border-radius: 10px;
+    background:
+      linear-gradient(125deg, rgba(255,255,255,.16) 0%, rgba(255,255,255,.04) 35%, rgba(255,255,255,0) 55%, rgba(255,255,255,.07) 100%),
+      var(--panel-bg);
+    -webkit-backdrop-filter: blur(14px) saturate(170%);
+    backdrop-filter: blur(14px) saturate(170%);
+    box-shadow:
+      inset 0 1px 0 var(--glass-edge),
+      inset 0 0 0 1px rgba(255,255,255,.1),
+      0 10px 30px rgba(0,0,0,.45);
+  }
+  .text > div::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    width: 16px; height: 16px;
+    margin-left: -8px;
+    background: var(--panel-bg);
+    -webkit-backdrop-filter: blur(14px) saturate(170%);
+    backdrop-filter: blur(14px) saturate(170%);
+    transform: rotate(45deg);
+  }
+  .step.row-0 .text > div::after { bottom: -8px; box-shadow: inset -1px -1px 0 rgba(255,255,255,.1); }
+  .step.row-1 .text > div::after { top: -8px; box-shadow: inset 1px 1px 0 var(--glass-edge); }
+  .step.open { z-index: 2; }
+  .step.row-0 .text { bottom: calc(100% + 16px); transform: translateY(8px); }
+  .step.row-1 .text { top: calc(100% + 16px); transform: translateY(-8px); }
+  .step.open .text { opacity: 1; visibility: visible; transform: none; transition: opacity .3s ease, transform .3s ease; }
+
+  /* Bouton « En savoir plus » à la fin du texte d'une bulle */
+  .more-btn {
+    margin-top: 10px;
+    padding: 5px 12px 4px;
+    border: 0;
+    border-radius: 2px;
+    background: var(--red);
+    color: #fff;
+    font: 500 13px/1.3 var(--body);
+    letter-spacing: .02em;
+    cursor: pointer;
+    transition: background .2s ease;
+  }
+  .more-btn:hover { background: #b80500; }
+  .more-btn:focus-visible { outline: 2px solid var(--fg); outline-offset: 3px; }
+
+  /* Fenêtre détaillée */
+  .stage { position: relative; overflow: hidden; }
+  .stage.panel-open { min-height: 520px; }
+  .panel {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    /* Effet verre d'eau : flou fort + saturation, reflet lumineux en biais, liseré clair sur les bords */
+    background:
+      linear-gradient(125deg, rgba(255,255,255,.14) 0%, rgba(255,255,255,.04) 28%, rgba(255,255,255,0) 45%, rgba(255,255,255,.05) 80%, rgba(255,255,255,.1) 100%),
+      var(--panel-bg);
+    -webkit-backdrop-filter: blur(18px) saturate(170%);
+    backdrop-filter: blur(18px) saturate(170%);
+    box-shadow:
+      inset 0 1px 0 var(--glass-edge),
+      inset 1px 0 0 var(--glass-edge),
+      inset 0 -1px 0 rgba(255,255,255,.08),
+      -24px 0 60px rgba(0,0,0,.45);
+    border-left: 6px solid var(--red);
+    transform: translateX(100%);
+    transition: transform .4s cubic-bezier(.2,.8,.2,1);
+  }
+  .panel.is-open { transform: none; }
+  /* Halo lumineux dans le coin haut, comme une goutte qui accroche la lumière */
+  .panel::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(60% 45% at 18% 0%, rgba(255,255,255,.16), rgba(255,255,255,0) 70%),
+                radial-gradient(40% 35% at 100% 100%, rgba(225,6,0,.12), rgba(225,6,0,0) 70%);
+  }
+  .panel-inner {
+    position: sticky;
+    top: 0;
+    max-height: 100vh;
+    height: 100%;
+    overflow-y: auto;
+    padding: 28px clamp(16px, 4vw, 56px) 40px;
+    /* Barre de défilement verticale blanche */
+    scrollbar-width: thin;
+    scrollbar-color: var(--scroll-thumb) var(--scroll-track);
+  }
+  .panel-inner::-webkit-scrollbar { width: 8px; }
+  .panel-inner::-webkit-scrollbar-track { background: var(--scroll-track); border-radius: 4px; }
+  .panel-inner::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 4px; }
+  .panel-inner::-webkit-scrollbar-thumb:hover { background: #e6e6e6; }
+  .panel-close {
+    position: absolute;
+    top: 20px; right: clamp(16px, 3vw, 40px);
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    border: 2px solid var(--red);
+    background: transparent;
+    color: var(--fg);
+    font-size: 16px;
+    cursor: pointer;
+  }
+  .panel-close:hover { background: var(--red); }
+  .panel-close:focus-visible { outline: 2px solid var(--fg); outline-offset: 3px; }
+  .panel-head {
+    display: grid;
+    gap: 6px;
+    padding-bottom: 18px;
+    margin-bottom: 22px;
+    border-bottom: 2px solid var(--red);
+    padding-right: 56px;
+  }
+  .panel-date {
+    margin: 0;
+    font-family: var(--display);
+    font-size: clamp(32px, 4vw, 52px);
+    line-height: 1;
+    letter-spacing: .03em;
+    font-variant-numeric: tabular-nums;
+  }
+  .panel-label {
+    margin: 0;
+    font-family: var(--display);
+    font-size: clamp(14px, 1.4vw, 18px);
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--red);
+  }
+  .panel-body { max-width: 70ch; display: grid; gap: 14px; }
+  .panel-body p { margin: 0; font-size: 16px; line-height: 1.5; }
+
+  /* Zoom : la frise est mise à l'échelle, la boîte qui l'entoure prend sa taille visible */
+  .zoom-box { position: relative; }
+  .zoom {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 6px;
+    padding-left: 14px;
+    border-left: 1px solid var(--rail);
+  }
+  .zoom-btn, .zoom-level {
+    height: 32px;
+    border: 2px solid var(--red);
+    background: transparent;
+    color: var(--fg);
+    cursor: pointer;
+  }
+  .zoom-btn { width: 32px; border-radius: 50%; font: 18px/1 var(--body); padding: 0; display: grid; place-items: center; }
+  .zoom-level {
+    min-width: 62px;
+    border-color: transparent;
+    font: 500 13px/1 var(--body);
+    font-variant-numeric: tabular-nums;
+  }
+  .zoom-btn:hover:not(:disabled) { background: var(--red); }
+  .zoom-level:hover { color: var(--red); }
+  .zoom-btn:disabled { opacity: .3; cursor: default; }
+  .zoom-btn:focus-visible, .zoom-level:focus-visible { outline: 2px solid var(--fg); outline-offset: 3px; }
+  @media (max-width: 760px) {
+    .nav { flex-wrap: wrap; }
+    .zoom { margin: 0 auto; border-left: 0; padding-left: 0; }
+  }
+
+  /* Barre de défilement */
+  .nav {
+    margin-top: 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .nav button.arrow {
+    flex: none;
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    border: 2px solid var(--red);
+    background: transparent;
+    color: var(--fg);
+    font: 18px/1 var(--body);
+    cursor: pointer;
+    display: grid; place-items: center;
+  }
+  .nav button.arrow:hover:not(:disabled) { background: var(--red); }
+  .nav button.arrow:disabled { opacity: .3; cursor: default; }
+  .nav button.arrow:focus-visible { outline: 2px solid var(--fg); outline-offset: 3px; }
+  .bar {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    height: 28px;
+    cursor: pointer;
+    touch-action: none;
+  }
+  .bar::before {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; top: 50%;
+    height: 4px; margin-top: -2px;
+    border-radius: 2px;
+    background: var(--rail);
+  }
+  .thumb {
+    position: absolute;
+    top: 50%;
+    height: 10px; margin-top: -5px;
+    border-radius: 5px;
+    background: var(--red);
+    left: 0; width: 100%;
+    cursor: grab;
+  }
+  .bar.dragging .thumb { cursor: grabbing; }
+  .bar:focus-visible { outline: 2px solid var(--fg); outline-offset: 3px; border-radius: 4px; }
+
+  @media (max-width: 760px) {
+    h1 .l1, h1 .l2 { justify-self: start; transform: none; margin: 0; }
+    :root {
+      --bubble-w: 104px; --bubble-h: 96px;
+      --pitch: 150px; --drop: 48px;
+      --text-w: 230px; --edge: 260px; --lane-gap: 130px;
+    }
+  }
+
+  /* Apparition progressive des bulles */
+  /* « Pop » : la ligne rouge se trace, puis la bulle jaillit, rebondit et lance une onde rouge */
+  .step.appear .bubble { animation: pop .7s cubic-bezier(.3,.7,.4,1) .4s backwards; }
+  @keyframes pop {
+    0%   { transform: scale(0); opacity: 0; }
+    45%  { transform: scale(1.18); opacity: 1; }
+    65%  { transform: scale(.92); }
+    82%  { transform: scale(1.04); }
+    100% { transform: scale(1); }
+  }
+  .step.appear .face { animation: face-in .4s ease .75s backwards; }
+  @keyframes face-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .step.appear::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 4px solid var(--red);
+    pointer-events: none;
+    opacity: 0;
+    animation: ripple .7s ease-out .62s;
+  }
+  @keyframes ripple {
+    0%   { transform: scale(.95); opacity: .9; }
+    100% { transform: scale(1.55); opacity: 0; }
+  }
+  .wire path.new { animation: draw .6s ease both; }
+  @keyframes draw { from { stroke-dashoffset: var(--len); } to { stroke-dashoffset: 0; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bubble, .text, .timeline, .panel { transition: none; }
+    .step.appear .bubble, .step.appear .face, .step.appear::after, .wire path.new { animation: none; }
+  }
+</style>
+</head>
+<body>
+<main class="page">
+  <div class="inner">
+    <nav class="site-nav" aria-label="Frises">
+      <a href="index.html">Histoire de la gauche</a>
+      <a href="mouvements-sociaux.html" aria-current="page">Mouvements sociaux</a>
+    </nav>
+    <h1>
+      <span class="l1">Histoire des mouvements sociaux en France</span>
+      <span class="l2">du Moyen Âge à aujourd'hui</span>
+    </h1>
+
+    <section class="welcome">
+      <h2>Bienvenue !</h2>
+      <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore.</p>
+    </section>
+
+    <section class="story">
+      <h2 id="chapter" aria-live="polite">Au Moyen Âge</h2>
+      <p class="hint">Cliquez sur une bulle pour afficher son texte et faire apparaître la suite. Chaque branche suit une grande famille de luttes, du Moyen Âge à aujourd'hui.</p>
+
+      <div class="stage" id="stage">
+      <div class="scroller" id="scroller" tabindex="0" aria-label="Frise chronologique">
+        <div class="zoom-box" id="zoomBox">
+        <div class="timeline" id="timeline" data-layout="chrono">
+          <svg class="wire" aria-hidden="true"><path id="wire"></path></svg>
+
+        <div class="step" data-id="u1358" data-next="u1382 p1358" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-1" aria-expanded="false" aria-controls="text-1" aria-label="Afficher le texte de 1358"><span class="face"><time class="date" datetime="1358">1358</time><span class="label">Révolte d'Étienne Marcel</span></span></button>
+          <div class="text" id="text-1" role="region" aria-labelledby="bubble-1">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec ullamcorper nulla non metus auctor fringilla. Vestibulum id ligula porta felis euismod semper. Cras mattis consectetur purus sit amet fermentum.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="u1382" data-next="u1413" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-2" aria-expanded="false" aria-controls="text-2" aria-label="Afficher le texte de 1382"><span class="face"><time class="date" datetime="1382">1382</time><span class="label">Révolte des Maillotins</span></span></button>
+          <div class="text" id="text-2" role="region" aria-labelledby="bubble-2">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer posuere erat a ante venenatis dapibus. Curabitur blandit tempus porttitor. Maecenas sed diam eget risus varius blandit sit amet non magna.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="u1413" data-next="u1648" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-3" aria-expanded="false" aria-controls="text-3" aria-label="Afficher le texte de 1413"><span class="face"><time class="date" datetime="1413">1413</time><span class="label">Révolte des Cabochiens</span></span></button>
+          <div class="text" id="text-3" role="region" aria-labelledby="bubble-3">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec ullamcorper nulla non metus auctor fringilla. Vestibulum id ligula porta felis euismod semper. Cras mattis consectetur purus sit amet fermentum.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="u1648" data-next="u1775" data-chapter="Sous l'Ancien Régime" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-4" aria-expanded="false" aria-controls="text-4" aria-label="Afficher le texte de 1648"><span class="face"><time class="date" datetime="1648">1648</time><span class="label">La Fronde</span></span></button>
+          <div class="text" id="text-4" role="region" aria-labelledby="bubble-4">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer posuere erat a ante venenatis dapibus. Curabitur blandit tempus porttitor. Maecenas sed diam eget risus varius blandit sit amet non magna.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="u1775" data-next="u1789" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-5" aria-expanded="false" aria-controls="text-5" aria-label="Afficher le texte de 1775"><span class="face"><time class="date" datetime="1775">1775</time><span class="label">Guerre des farines</span></span></button>
+          <div class="text" id="text-5" role="region" aria-labelledby="bubble-5">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec ullamcorper nulla non metus auctor fringilla. Vestibulum id ligula porta felis euismod semper. Cras mattis consectetur purus sit amet fermentum.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="u1789" data-next="u1830 f1791" data-chapter="La Révolution" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-6" aria-expanded="false" aria-controls="text-6" aria-label="Afficher le texte de 1789"><span class="face"><time class="date" datetime="1789">1789</time><span class="label">Prise de la Bastille</span></span></button>
+          <div class="text" id="text-6" role="region" aria-labelledby="bubble-6">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer posuere erat a ante venenatis dapibus. Curabitur blandit tempus porttitor. Maecenas sed diam eget risus varius blandit sit amet non magna.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="u1830" data-next="u1831" data-chapter="Le siècle ouvrier" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-7" aria-expanded="false" aria-controls="text-7" aria-label="Afficher le texte de 1830"><span class="face"><time class="date" datetime="1830">1830</time><span class="label">Les Trois Glorieuses</span></span></button>
+          <div class="text" id="text-7" role="region" aria-labelledby="bubble-7">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec ullamcorper nulla non metus auctor fringilla. Vestibulum id ligula porta felis euismod semper. Cras mattis consectetur purus sit amet fermentum.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="u1831" data-next="u1848" data-branch="Mouvement ouvrier" data-shift="110" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-8" aria-expanded="false" aria-controls="text-8" aria-label="Afficher le texte de 1831"><span class="face"><time class="date" datetime="1831">1831</time><span class="label">Révolte des canuts</span></span></button>
+          <div class="text" id="text-8" role="region" aria-labelledby="bubble-8">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer posuere erat a ante venenatis dapibus. Curabitur blandit tempus porttitor. Maecenas sed diam eget risus varius blandit sit amet non magna.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="u1848" data-next="u1864" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-9" aria-expanded="false" aria-controls="text-9" aria-label="Afficher le texte de 1848"><span class="face"><time class="date" datetime="1848">1848</time><span class="label">Journées de juin</span></span></button>
+          <div class="text" id="text-9" role="region" aria-labelledby="bubble-9">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec ullamcorper nulla non metus auctor fringilla. Vestibulum id ligula porta felis euismod semper. Cras mattis consectetur purus sit amet fermentum.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="u1864" data-next="u1871" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-10" aria-expanded="false" aria-controls="text-10" aria-label="Afficher le texte de 1864"><span class="face"><time class="date" datetime="1864">1864</time><span class="label">Droit de grève</span></span></button>
+          <div class="text" id="text-10" role="region" aria-labelledby="bubble-10">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer posuere erat a ante venenatis dapibus. Curabitur blandit tempus porttitor. Maecenas sed diam eget risus varius blandit sit amet non magna.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="u1871" data-next="u1884" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-11" aria-expanded="false" aria-controls="text-11" aria-label="Afficher le texte de 1871"><span class="face"><time class="date" datetime="1871">1871</time><span class="label">Commune de Paris</span></span></button>
+          <div class="text" id="text-11" role="region" aria-labelledby="bubble-11">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec ullamcorper nulla non metus auctor fringilla. Vestibulum id ligula porta felis euismod semper. Cras mattis consectetur purus sit amet fermentum.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="u1884" data-next="u1891" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-12" aria-expanded="false" aria-controls="text-12" aria-label="Afficher le texte de 1884"><span class="face"><time class="date" datetime="1884">1884</time><span class="label">Syndicats autorisés</span></span></button>
+          <div class="text" id="text-12" role="region" aria-labelledby="bubble-12">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer posuere erat a ante venenatis dapibus. Curabitur blandit tempus porttitor. Maecenas sed diam eget risus varius blandit sit amet non magna.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="u1891" data-next="u1895" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-13" aria-expanded="false" aria-controls="text-13" aria-label="Afficher le texte de 1891"><span class="face"><time class="date" datetime="1891">1891</time><span class="label">Fusillade de Fourmies</span></span></button>
+          <div class="text" id="text-13" role="region" aria-labelledby="bubble-13">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec ullamcorper nulla non metus auctor fringilla. Vestibulum id ligula porta felis euismod semper. Cras mattis consectetur purus sit amet fermentum.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="u1895" data-next="u1906" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-14" aria-expanded="false" aria-controls="text-14" aria-label="Afficher le texte de 1895"><span class="face"><time class="date" datetime="1895">1895</time><span class="label">Naissance de la CGT</span></span></button>
+          <div class="text" id="text-14" role="region" aria-labelledby="bubble-14">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer posuere erat a ante venenatis dapibus. Curabitur blandit tempus porttitor. Maecenas sed diam eget risus varius blandit sit amet non magna.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="u1906" data-next="u1936" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-15" aria-expanded="false" aria-controls="text-15" aria-label="Afficher le texte de 1906"><span class="face"><time class="date" datetime="1906">1906</time><span class="label">Charte d'Amiens</span></span></button>
+          <div class="text" id="text-15" role="region" aria-labelledby="bubble-15">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec ullamcorper nulla non metus auctor fringilla. Vestibulum id ligula porta felis euismod semper. Cras mattis consectetur purus sit amet fermentum.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="u1936" data-next="u1947" data-chapter="Le XXe siècle" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-16" aria-expanded="false" aria-controls="text-16" aria-label="Afficher le texte de 1936"><span class="face"><time class="date" datetime="1936">1936</time><span class="label">Grèves de juin 1936</span></span></button>
+          <div class="text" id="text-16" role="region" aria-labelledby="bubble-16">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer posuere erat a ante venenatis dapibus. Curabitur blandit tempus porttitor. Maecenas sed diam eget risus varius blandit sit amet non magna.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="u1947" data-next="u1968" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-17" aria-expanded="false" aria-controls="text-17" aria-label="Afficher le texte de 1947"><span class="face"><time class="date" datetime="1947">1947</time><span class="label">Grèves de 1947</span></span></button>
+          <div class="text" id="text-17" role="region" aria-labelledby="bubble-17">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec ullamcorper nulla non metus auctor fringilla. Vestibulum id ligula porta felis euismod semper. Cras mattis consectetur purus sit amet fermentum.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="u1968" data-next="u1995 j1986 a1983" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-18" aria-expanded="false" aria-controls="text-18" aria-label="Afficher le texte de 1968"><span class="face"><time class="date" datetime="1968">1968</time><span class="label">Mai 68</span></span></button>
+          <div class="text" id="text-18" role="region" aria-labelledby="bubble-18">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer posuere erat a ante venenatis dapibus. Curabitur blandit tempus porttitor. Maecenas sed diam eget risus varius blandit sit amet non magna.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="u1995" data-next="u2010" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-19" aria-expanded="false" aria-controls="text-19" aria-label="Afficher le texte de 1995"><span class="face"><time class="date" datetime="1995">1995</time><span class="label">Grèves contre le plan Juppé</span></span></button>
+          <div class="text" id="text-19" role="region" aria-labelledby="bubble-19">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec ullamcorper nulla non metus auctor fringilla. Vestibulum id ligula porta felis euismod semper. Cras mattis consectetur purus sit amet fermentum.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="u2010" data-next="u2016" data-chapter="Le XXIe siècle" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-20" aria-expanded="false" aria-controls="text-20" aria-label="Afficher le texte de 2010"><span class="face"><time class="date" datetime="2010">2010</time><span class="label">Retraites : 62 ans</span></span></button>
+          <div class="text" id="text-20" role="region" aria-labelledby="bubble-20">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer posuere erat a ante venenatis dapibus. Curabitur blandit tempus porttitor. Maecenas sed diam eget risus varius blandit sit amet non magna.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="u2016" data-next="u2023 h2016" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-21" aria-expanded="false" aria-controls="text-21" aria-label="Afficher le texte de 2016"><span class="face"><time class="date" datetime="2016">2016</time><span class="label">Loi Travail</span></span></button>
+          <div class="text" id="text-21" role="region" aria-labelledby="bubble-21">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec ullamcorper nulla non metus auctor fringilla. Vestibulum id ligula porta felis euismod semper. Cras mattis consectetur purus sit amet fermentum.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="u2023" data-next="u2026" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-22" aria-expanded="false" aria-controls="text-22" aria-label="Afficher le texte de 2023"><span class="face"><time class="date" datetime="2023">2023</time><span class="label">Retraites : 64 ans</span></span></button>
+          <div class="text" id="text-22" role="region" aria-labelledby="bubble-22">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer posuere erat a ante venenatis dapibus. Curabitur blandit tempus porttitor. Maecenas sed diam eget risus varius blandit sit amet non magna.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="u2026" data-track="0" data-next="" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-23" aria-expanded="false" aria-controls="text-23" aria-label="Afficher le texte de 2026"><span class="face"><time class="date" datetime="2026">2026</time><span class="label">Contre la vie chère</span></span></button>
+          <div class="text" id="text-23" role="region" aria-labelledby="bubble-23">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec ullamcorper nulla non metus auctor fringilla. Vestibulum id ligula porta felis euismod semper. Cras mattis consectetur purus sit amet fermentum.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="p1358" data-track="-1" data-next="p1548" data-branch="Révoltes paysannes" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-24" aria-expanded="false" aria-controls="text-24" aria-label="Afficher le texte de 1358"><span class="face"><time class="date" datetime="1358">1358</time><span class="label">Grande Jacquerie</span></span></button>
+          <div class="text" id="text-24" role="region" aria-labelledby="bubble-24">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer posuere erat a ante venenatis dapibus. Curabitur blandit tempus porttitor. Maecenas sed diam eget risus varius blandit sit amet non magna.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="p1548" data-next="p1636" data-chapter="Sous l'Ancien Régime" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-25" aria-expanded="false" aria-controls="text-25" aria-label="Afficher le texte de 1548"><span class="face"><time class="date" datetime="1548">1548</time><span class="label">Révolte des Pitauds</span></span></button>
+          <div class="text" id="text-25" role="region" aria-labelledby="bubble-25">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec ullamcorper nulla non metus auctor fringilla. Vestibulum id ligula porta felis euismod semper. Cras mattis consectetur purus sit amet fermentum.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="p1636" data-next="p1639" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-26" aria-expanded="false" aria-controls="text-26" aria-label="Afficher le texte de 1636"><span class="face"><time class="date" datetime="1636">1636</time><span class="label">Révolte des Croquants</span></span></button>
+          <div class="text" id="text-26" role="region" aria-labelledby="bubble-26">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer posuere erat a ante venenatis dapibus. Curabitur blandit tempus porttitor. Maecenas sed diam eget risus varius blandit sit amet non magna.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="p1639" data-next="p1675" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-27" aria-expanded="false" aria-controls="text-27" aria-label="Afficher le texte de 1639"><span class="face"><time class="date" datetime="1639">1639</time><span class="label">Révolte des Va-nu-pieds</span></span></button>
+          <div class="text" id="text-27" role="region" aria-labelledby="bubble-27">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec ullamcorper nulla non metus auctor fringilla. Vestibulum id ligula porta felis euismod semper. Cras mattis consectetur purus sit amet fermentum.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="p1675" data-next="p1907" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-28" aria-expanded="false" aria-controls="text-28" aria-label="Afficher le texte de 1675"><span class="face"><time class="date" datetime="1675">1675</time><span class="label">Bonnets rouges</span></span></button>
+          <div class="text" id="text-28" role="region" aria-labelledby="bubble-28">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer posuere erat a ante venenatis dapibus. Curabitur blandit tempus porttitor. Maecenas sed diam eget risus varius blandit sit amet non magna.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="p1907" data-next="p1971" data-chapter="Le XXe siècle" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-29" aria-expanded="false" aria-controls="text-29" aria-label="Afficher le texte de 1907"><span class="face"><time class="date" datetime="1907">1907</time><span class="label">Révolte des vignerons</span></span></button>
+          <div class="text" id="text-29" role="region" aria-labelledby="bubble-29">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec ullamcorper nulla non metus auctor fringilla. Vestibulum id ligula porta felis euismod semper. Cras mattis consectetur purus sit amet fermentum.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="p1971" data-next="p2024 e1977" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-30" aria-expanded="false" aria-controls="text-30" aria-label="Afficher le texte de 1971"><span class="face"><time class="date" datetime="1971">1971</time><span class="label">Lutte du Larzac</span></span></button>
+          <div class="text" id="text-30" role="region" aria-labelledby="bubble-30">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer posuere erat a ante venenatis dapibus. Curabitur blandit tempus porttitor. Maecenas sed diam eget risus varius blandit sit amet non magna.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="p2024" data-next="" data-chapter="Le XXIe siècle" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-31" aria-expanded="false" aria-controls="text-31" aria-label="Afficher le texte de 2024"><span class="face"><time class="date" datetime="2024">2024</time><span class="label">Colère des agriculteurs</span></span></button>
+          <div class="text" id="text-31" role="region" aria-labelledby="bubble-31">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec ullamcorper nulla non metus auctor fringilla. Vestibulum id ligula porta felis euismod semper. Cras mattis consectetur purus sit amet fermentum.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="e1977" data-track="-2" data-next="e2019" data-branch="Écologie" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-32" aria-expanded="false" aria-controls="text-32" aria-label="Afficher le texte de 1977"><span class="face"><time class="date" datetime="1977">1977</time><span class="label">Creys-Malville</span></span></button>
+          <div class="text" id="text-32" role="region" aria-labelledby="bubble-32">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer posuere erat a ante venenatis dapibus. Curabitur blandit tempus porttitor. Maecenas sed diam eget risus varius blandit sit amet non magna.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="e2019" data-next="e2023" data-chapter="Le XXIe siècle" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-33" aria-expanded="false" aria-controls="text-33" aria-label="Afficher le texte de 2019"><span class="face"><time class="date" datetime="2019">2019</time><span class="label">Marches pour le climat</span></span></button>
+          <div class="text" id="text-33" role="region" aria-labelledby="bubble-33">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec ullamcorper nulla non metus auctor fringilla. Vestibulum id ligula porta felis euismod semper. Cras mattis consectetur purus sit amet fermentum.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="e2023" data-next="" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-34" aria-expanded="false" aria-controls="text-34" aria-label="Afficher le texte de 2023"><span class="face"><time class="date" datetime="2023">2023</time><span class="label">Sainte-Soline</span></span></button>
+          <div class="text" id="text-34" role="region" aria-labelledby="bubble-34">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer posuere erat a ante venenatis dapibus. Curabitur blandit tempus porttitor. Maecenas sed diam eget risus varius blandit sit amet non magna.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="h2016" data-track="1" data-next="h2018" data-branch="Hors partis et syndicats" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-35" aria-expanded="false" aria-controls="text-35" aria-label="Afficher le texte de 2016"><span class="face"><time class="date" datetime="2016">2016</time><span class="label">Nuit debout</span></span></button>
+          <div class="text" id="text-35" role="region" aria-labelledby="bubble-35">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec ullamcorper nulla non metus auctor fringilla. Vestibulum id ligula porta felis euismod semper. Cras mattis consectetur purus sit amet fermentum.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="h2018" data-next="h2025" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-36" aria-expanded="false" aria-controls="text-36" aria-label="Afficher le texte de 2018"><span class="face"><time class="date" datetime="2018">2018</time><span class="label">Gilets jaunes</span></span></button>
+          <div class="text" id="text-36" role="region" aria-labelledby="bubble-36">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer posuere erat a ante venenatis dapibus. Curabitur blandit tempus porttitor. Maecenas sed diam eget risus varius blandit sit amet non magna.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="h2025" data-next="u2026" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-37" aria-expanded="false" aria-controls="text-37" aria-label="Afficher le texte de 2025"><span class="face"><time class="date" datetime="2025">2025</time><span class="label">« Bloquons tout »</span></span></button>
+          <div class="text" id="text-37" role="region" aria-labelledby="bubble-37">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec ullamcorper nulla non metus auctor fringilla. Vestibulum id ligula porta felis euismod semper. Cras mattis consectetur purus sit amet fermentum.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="j1986" data-track="2" data-next="j2006" data-branch="Jeunesse" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-38" aria-expanded="false" aria-controls="text-38" aria-label="Afficher le texte de 1986"><span class="face"><time class="date" datetime="1986">1986</time><span class="label">Contre la loi Devaquet</span></span></button>
+          <div class="text" id="text-38" role="region" aria-labelledby="bubble-38">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer posuere erat a ante venenatis dapibus. Curabitur blandit tempus porttitor. Maecenas sed diam eget risus varius blandit sit amet non magna.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="j2006" data-next="u2026" data-chapter="Le XXIe siècle" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-39" aria-expanded="false" aria-controls="text-39" aria-label="Afficher le texte de 2006"><span class="face"><time class="date" datetime="2006">2006</time><span class="label">Mouvement anti-CPE</span></span></button>
+          <div class="text" id="text-39" role="region" aria-labelledby="bubble-39">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec ullamcorper nulla non metus auctor fringilla. Vestibulum id ligula porta felis euismod semper. Cras mattis consectetur purus sit amet fermentum.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="a1983" data-track="3" data-next="a2005" data-branch="Antiracisme" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-40" aria-expanded="false" aria-controls="text-40" aria-label="Afficher le texte de 1983"><span class="face"><time class="date" datetime="1983">1983</time><span class="label">Marche pour l'égalité</span></span></button>
+          <div class="text" id="text-40" role="region" aria-labelledby="bubble-40">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer posuere erat a ante venenatis dapibus. Curabitur blandit tempus porttitor. Maecenas sed diam eget risus varius blandit sit amet non magna.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="a2005" data-next="a2023" data-chapter="Le XXIe siècle" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-41" aria-expanded="false" aria-controls="text-41" aria-label="Afficher le texte de 2005"><span class="face"><time class="date" datetime="2005">2005</time><span class="label">Révoltes des banlieues</span></span></button>
+          <div class="text" id="text-41" role="region" aria-labelledby="bubble-41">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec ullamcorper nulla non metus auctor fringilla. Vestibulum id ligula porta felis euismod semper. Cras mattis consectetur purus sit amet fermentum.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="a2023" data-next="" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-42" aria-expanded="false" aria-controls="text-42" aria-label="Afficher le texte de 2023"><span class="face"><time class="date" datetime="2023">2023</time><span class="label">Révoltes après la mort de Nahel</span></span></button>
+          <div class="text" id="text-42" role="region" aria-labelledby="bubble-42">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer posuere erat a ante venenatis dapibus. Curabitur blandit tempus porttitor. Maecenas sed diam eget risus varius blandit sit amet non magna.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="f1791" data-track="4" data-next="f1944" data-branch="Féminisme" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-43" aria-expanded="false" aria-controls="text-43" aria-label="Afficher le texte de 1791"><span class="face"><time class="date" datetime="1791">1791</time><span class="label">Déclaration d'Olympe de Gouges</span></span></button>
+          <div class="text" id="text-43" role="region" aria-labelledby="bubble-43">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec ullamcorper nulla non metus auctor fringilla. Vestibulum id ligula porta felis euismod semper. Cras mattis consectetur purus sit amet fermentum.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="f1944" data-next="f1971" data-chapter="Le XXe siècle" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-44" aria-expanded="false" aria-controls="text-44" aria-label="Afficher le texte de 1944"><span class="face"><time class="date" datetime="1944">1944</time><span class="label">Droit de vote des femmes</span></span></button>
+          <div class="text" id="text-44" role="region" aria-labelledby="bubble-44">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer posuere erat a ante venenatis dapibus. Curabitur blandit tempus porttitor. Maecenas sed diam eget risus varius blandit sit amet non magna.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="f1971" data-next="f1975" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-45" aria-expanded="false" aria-controls="text-45" aria-label="Afficher le texte de 1971"><span class="face"><time class="date" datetime="1971">1971</time><span class="label">Manifeste des 343</span></span></button>
+          <div class="text" id="text-45" role="region" aria-labelledby="bubble-45">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec ullamcorper nulla non metus auctor fringilla. Vestibulum id ligula porta felis euismod semper. Cras mattis consectetur purus sit amet fermentum.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="f1975" data-next="f2017" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-46" aria-expanded="false" aria-controls="text-46" aria-label="Afficher le texte de 1975"><span class="face"><time class="date" datetime="1975">1975</time><span class="label">Loi Veil</span></span></button>
+          <div class="text" id="text-46" role="region" aria-labelledby="bubble-46">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Integer posuere erat a ante venenatis dapibus. Curabitur blandit tempus porttitor. Maecenas sed diam eget risus varius blandit sit amet non magna.</p></div>
+          </div>
+        </div>
+
+        <div class="step" data-id="f2017" data-next="" data-chapter="Le XXIe siècle" style="/* --img: url('...') */">
+          <button class="bubble" id="bubble-47" aria-expanded="false" aria-controls="text-47" aria-label="Afficher le texte de 2017"><span class="face"><time class="date" datetime="2017">2017</time><span class="label">#MeToo</span></span></button>
+          <div class="text" id="text-47" role="region" aria-labelledby="bubble-47">
+            <div><p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Donec ullamcorper nulla non metus auctor fringilla. Vestibulum id ligula porta felis euismod semper. Cras mattis consectetur purus sit amet fermentum.</p></div>
+          </div>
+        </div>
+        </div>
+        </div>
+      </div>
+
+        <!-- Fenêtre « En savoir plus » : glisse depuis la droite et couvre toute la largeur de la frise -->
+        <aside class="panel" id="panel" role="dialog" aria-modal="false" aria-labelledby="panel-date" hidden>
+          <div class="panel-inner">
+            <button class="panel-close" id="panel-close" aria-label="Fermer">&#10005;</button>
+            <header class="panel-head">
+              <p class="panel-date" id="panel-date"></p>
+              <p class="panel-label" id="panel-label"></p>
+            </header>
+            <div class="panel-body" id="panel-body"></div>
+          </div>
+        </aside>
+      </div>
+
+      <div class="nav">
+        <button class="arrow" id="prev" aria-label="Défiler vers la gauche">&#8592;</button>
+        <div class="bar" id="bar" role="scrollbar" aria-controls="scroller" aria-orientation="horizontal" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" tabindex="0" aria-label="Barre de défilement de la frise">
+          <div class="thumb" id="thumb"></div>
+        </div>
+        <button class="arrow" id="next" aria-label="Défiler vers la droite">&#8594;</button>
+        <div class="zoom" role="group" aria-label="Zoom de la frise">
+          <button class="zoom-btn" id="zoom-out" aria-label="Dézoomer">&#8722;</button>
+          <button class="zoom-level" id="zoom-reset" title="Revenir à 100 %" aria-label="Revenir à 100 %">100 %</button>
+          <button class="zoom-btn" id="zoom-in" aria-label="Zoomer">+</button>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script>
+  (function () {
+    const scroller = document.getElementById('scroller');
+    const timeline = document.getElementById('timeline');
+    const wire = document.getElementById('wire');
+    const steps = [...timeline.querySelectorAll('.step')];
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const zoomBox = document.getElementById('zoomBox');
+    let z = 1; // niveau de zoom de la frise
+
+    // ---- Graphe : chaque bulle a un data-id et un data-next (ids des bulles suivantes, séparés par des espaces)
+    // Scission : plusieurs ids dans data-next (ex. data-next="1936 1947"). Le 1er id reste sur la ligne principale,
+    // les suivants ouvrent une nouvelle branche en dessous.
+    // Branche qui s'arrête : data-next="" (vide) sur sa dernière bulle.
+    // Branches qui se rejoignent : plusieurs bulles avec le même id dans leur data-next.
+    // Nom de branche : data-branch="..." sur la 1re bulle de la branche.
+    const byId = new Map(steps.map((s, i) => [s.dataset.id || String(i), s]));
+    steps.forEach((s, i) => { if (!s.dataset.id) s.dataset.id = String(i); });
+    const kids = new Map(), parents = new Map();
+    steps.forEach((s, i) => {
+      const id = s.dataset.id;
+      let next = s.dataset.next !== undefined
+        ? s.dataset.next.split(/[\s,]+/).filter(Boolean)
+        : (steps[i + 1] ? [steps[i + 1].dataset.id] : []); // sans data-next : on enchaîne sur la bulle suivante
+      next = next.filter(n => byId.has(n));
+      kids.set(id, next);
+      if (!parents.has(id)) parents.set(id, []);
+      next.forEach(n => { if (!parents.has(n)) parents.set(n, []); parents.get(n).push(id); });
+    });
+
+    // Colonne = profondeur (plus long chemin depuis le début)
+    const col = new Map();
+    function colOf(id, seen = new Set()) {
+      if (col.has(id)) return col.get(id);
+      if (seen.has(id)) return 0; seen.add(id);
+      const ps = parents.get(id) || [];
+      const c = ps.length ? Math.max(...ps.map(p => colOf(p, seen))) + 1 : 0;
+      col.set(id, c); return c;
+    }
+    steps.forEach(s => colOf(s.dataset.id));
+
+    // Placement chronologique (data-layout="chrono") : une colonne par année, les bulles d'une même
+    // année sont alignées verticalement, et une suite reste toujours à droite de sa bulle de départ.
+    if (timeline.dataset.layout === 'chrono') {
+      const yearOf = s => parseInt(s.querySelector('.date').getAttribute('datetime'), 10);
+      const depth = new Map(col);
+      const sorted = [...steps].sort((a, b) => yearOf(a) - yearOf(b) || depth.get(a.dataset.id) - depth.get(b.dataset.id));
+      let maxCol = -1, lastYear = null, yearStart = 0;
+      sorted.forEach(s => {
+        const y = yearOf(s);
+        if (y !== lastYear) { yearStart = maxCol + 1; lastYear = y; }
+        const ps = parents.get(s.dataset.id) || [];
+        const c = Math.max(yearStart, ...ps.map(p => col.get(p) + 1));
+        col.set(s.dataset.id, c);
+        maxCol = Math.max(maxCol, c);
+      });
+    }
+
+    // Voie (branche) : la 1re suite garde la voie du parent, les autres ouvrent une nouvelle voie en dessous.
+    // data-track="2" sur une bulle force sa voie.
+    const order = [...steps].sort((a, b) => col.get(a.dataset.id) - col.get(b.dataset.id));
+    const track = new Map(), cand = new Map();
+    let nextTrack = 1;
+    order.forEach(s => {
+      const id = s.dataset.id;
+      if (s.dataset.track !== undefined) track.set(id, +s.dataset.track);
+      else if (cand.has(id)) track.set(id, Math.min(...cand.get(id)));
+      else track.set(id, track.size ? nextTrack++ : 0);
+      kids.get(id).forEach((k, j) => {
+        let t = track.get(id);
+        if (j > 0) { const forced = byId.get(k).dataset.track; t = forced !== undefined ? +forced : nextTrack++; }
+        if (!cand.has(k)) cand.set(k, []);
+        cand.get(k).push(t);
+      });
+    });
+
+    // Compactage : une branche terminée libère sa voie pour une branche qui commence plus loin
+    const span = new Map(); // voie provisoire -> [col début, col fin]
+    steps.forEach(s => {
+      const id = s.dataset.id, t = track.get(id), c = col.get(id);
+      const ps = (parents.get(id) || []).filter(p => track.get(p) !== t);
+      const start = ps.length ? c - 1 : c; // inclut le raccord depuis la branche mère
+      const r = span.get(t) || [Infinity, -Infinity];
+      span.set(t, [Math.min(r[0], start), Math.max(r[1], c)]);
+    });
+    const manual = steps.some(s => s.dataset.track !== undefined);
+    const lanes = []; // voie réelle -> liste d'intervalles
+    const remap = new Map();
+    [...span.keys()].sort((a, b) => a - b).forEach(t => {
+      const [a, b] = span.get(t);
+      let lane = 0;
+      while (lanes[lane] && lanes[lane].some(([x, y]) => a <= y && b >= x)) lane++;
+      (lanes[lane] = lanes[lane] || []).push([a, b]);
+      remap.set(t, lane);
+    });
+    // data-track sur la 1re bulle d'une branche = ordre des voies choisi à la main (les suivantes en héritent)
+    if (!manual) steps.forEach(s => track.set(s.dataset.id, remap.get(track.get(s.dataset.id))));
+    const maxLane = Math.max(0, ...steps.map(s => track.get(s.dataset.id)));
+
+    // data-shift="90" : décale cette bulle (et toute la suite de la frise) de 90 px vers la droite
+    const shiftAt = new Map();
+    steps.forEach(s => { if (s.dataset.shift) { const c = col.get(s.dataset.id); shiftAt.set(c, Math.max(shiftAt.get(c) || 0, +s.dataset.shift)); } });
+    const dxOf = c => [...shiftAt].reduce((sum, [k, v]) => sum + (k <= c ? v : 0), 0);
+    steps.forEach(s => s.style.setProperty('--dx', dxOf(col.get(s.dataset.id)) + 'px'));
+
+    const roots = steps.filter(s => !(parents.get(s.dataset.id) || []).length);
+    steps.forEach(s => {
+      const id = s.dataset.id, c = col.get(id), r = c % 2;
+      s.style.setProperty('--n', c);
+      s.style.setProperty('--row', r);
+      s.style.setProperty('--track', track.get(id));
+      // Texte au-dessus (row-0) ou en dessous (row-1) ; data-text="above" / "below" force la position
+      const tr = s.dataset.text === 'above' ? 0 : s.dataset.text === 'below' ? 1 : r;
+      s.classList.add('row-' + tr);
+      s.hidden = !roots.includes(s); // seules les bulles de départ sont visibles
+      if (!s.hidden) s.classList.add('appear'); // la 1re bulle fait aussi son « pop » au chargement
+    });
+
+    // Étiquette de branche (data-branch) sur la 1re bulle d'une branche
+    steps.forEach(s => {
+      if (!s.dataset.branch) return;
+      const tag = document.createElement('span');
+      tag.className = 'branch-tag';
+      tag.textContent = s.dataset.branch;
+      s.prepend(tag);
+    });
+
+    // ---- Titre de chapitre : data-chapter="..." sur une bulle change le titre « Au commencement »
+    // quand on clique sur cette bulle ; les bulles suivantes (et leurs branches) gardent ce titre
+    // jusqu'à la prochaine bulle qui a son propre data-chapter.
+    const chapterEl = document.getElementById('chapter');
+    const DEFAULT_CHAPTER = chapterEl.textContent;
+    function chapterOf(step) {
+      let id = step.dataset.id;
+      const seen = new Set();
+      while (id && !seen.has(id)) {
+        seen.add(id);
+        const s = byId.get(id);
+        if (s.dataset.chapter) return s.dataset.chapter;
+        id = (parents.get(id) || [])[0];
+      }
+      return DEFAULT_CHAPTER;
+    }
+    let chapterTimer = null;
+    function setChapter(text) {
+      if (chapterEl.textContent === text && !chapterEl.classList.contains('out')) return;
+      clearTimeout(chapterTimer);
+      if (reduce) { chapterEl.textContent = text; return; }
+      chapterEl.classList.add('out');
+      chapterTimer = setTimeout(() => { chapterEl.textContent = text; chapterEl.classList.remove('out'); }, 250);
+    }
+
+    const newEdges = new Set();
+
+    function cssPx(name) {
+      return parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name)) || 0;
+    }
+
+    // Taille de la frise = jusqu'à la bulle visible la plus à droite / la voie la plus basse
+    function sizeTimeline() {
+      const shown = steps.filter(s => !s.hidden);
+      const maxCol = Math.max(0, ...shown.map(s => col.get(s.dataset.id)));
+      const lanesShown = shown.map(s => track.get(s.dataset.id));
+      const minT = Math.min(0, ...lanesShown), maxT = Math.max(0, ...lanesShown);
+      timeline.style.width = (cssPx('--text-w') + maxCol * cssPx('--pitch') + dxOf(maxCol) + 24) + 'px';
+      timeline.style.minWidth = (scroller.clientWidth / z) + 'px';
+      timeline.style.setProperty('--tracks', maxT - minT + 1);
+      // Les voies au-dessus de la ligne principale (data-track négatif) décalent tout vers le bas quand elles apparaissent
+      steps.forEach(s => s.style.setProperty('--track', track.get(s.dataset.id) - minT));
+      if (shiftMin !== null && minT !== shiftMin) {
+        const band = cssPx('--bubble-h') + cssPx('--drop') + cssPx('--lane-gap');
+        window.scrollBy({ top: (shiftMin - minT) * band * z, behavior: 'auto' });
+      }
+      shiftMin = minT;
+    }
+    let shiftMin = null;
+
+    // Ouvre / ferme le texte d'une bulle, et révèle toutes ses suites au premier clic
+    steps.forEach(step => {
+      const btn = step.querySelector('.bubble');
+      btn.addEventListener('click', () => {
+        const open = step.classList.toggle('open');
+        btn.setAttribute('aria-expanded', String(open));
+        btn.setAttribute('aria-label', (open ? 'Masquer' : 'Afficher') + ' le texte de ' + btn.querySelector('.date').textContent.trim());
+        if (!open) return;
+        setChapter(chapterOf(step));
+        // Un seul texte affiché à la fois : on referme les autres bulles ouvertes
+        steps.forEach(other => {
+          if (other === step || !other.classList.contains('open')) return;
+          other.classList.remove('open');
+          const ob = other.querySelector('.bubble');
+          ob.setAttribute('aria-expanded', 'false');
+          ob.setAttribute('aria-label', 'Afficher le texte de ' + ob.querySelector('.date').textContent.trim());
+        });
+        const revealed = [];
+        kids.get(step.dataset.id).forEach(k => {
+          const n = byId.get(k);
+          if (!newEdges.has(step.dataset.id + '>' + k) && !wire.parentNode.querySelector(`[data-edge="${step.dataset.id}>${k}"]`)) newEdges.add(step.dataset.id + '>' + k);
+          if (n.hidden) { n.hidden = false; n.classList.add('appear'); revealed.push(n); }
+        });
+        sizeTimeline();
+        drawWire();
+        updateBar();
+        if (revealed.length) {
+          // Amène les nouvelles bulles dans le champ
+          const left = Math.min(...revealed.map(n => n.offsetLeft));
+          const right = Math.max(...revealed.map(n => n.offsetLeft + n.offsetWidth));
+          const target = (left + right) / 2 * z - scroller.clientWidth / 2;
+          scroller.scrollTo({ left: Math.max(0, target), behavior: reduce ? 'auto' : 'smooth' });
+          const low = revealed.reduce((a, b) => (b.getBoundingClientRect().bottom > a.getBoundingClientRect().bottom ? b : a));
+          const rb = low.getBoundingClientRect();
+          if (rb.bottom > innerHeight - 40) window.scrollBy({ top: rb.bottom - innerHeight + 140, behavior: reduce ? 'auto' : 'smooth' });
+        }
+      });
+    });
+
+    // Une ligne rouge courbe par lien entre deux bulles visibles
+    function edgePath(a, b) {
+      const w = a.offsetWidth, h = a.offsetHeight;
+      const dy = b.offsetTop - a.offsetTop;
+      const bx = b.offsetLeft + 4, by = b.offsetTop + h / 2;
+      if (Math.abs(dy) < 2) { // même hauteur : trait droit
+        return `M${a.offsetLeft + w - 4},${a.offsetTop + h / 2} L${bx},${by}`;
+      }
+      const down = dy > 0;
+      if (Math.abs(dy) > a.offsetHeight + 4) {
+        // Changement de voie (scission ou ralliement) : trajet en équerre dans l'espace entre deux colonnes.
+        // Le décalage dépend de la voie de départ pour que deux lignes parallèles ne se superposent pas.
+        const lane = track.get(a.dataset.id);
+        // Scission : décalage selon la voie de départ. Ralliement : plus la voie est basse, plus la verticale est proche
+        // de la bulle d'arrivée, pour que les lignes se rejoignent sans se croiser.
+        const off = down ? 40 : 8 + 8 * (maxLane - lane);
+        const isSplit = kids.get(a.dataset.id).indexOf(b.dataset.id) > 0; // b ouvre une nouvelle branche
+        if (!down && isSplit) {
+          // Nouvelle branche vers le haut : la ligne part du haut de la bulle
+          const cx = a.offsetLeft + w / 2, r = 18;
+          return `M${cx},${a.offsetTop + 3} L${cx},${by + r} Q${cx},${by} ${cx + r},${by} L${bx},${by}`;
+        }
+        if (down && isSplit) {
+          // Nouvelle branche : la ligne part du bas de la bulle, descend puis tourne vers la 1re bulle de la branche
+          const cx = a.offsetLeft + w / 2, r = 18;
+          return `M${cx},${a.offsetTop + h - 3} L${cx},${by - r} Q${cx},${by} ${cx + r},${by} L${bx},${by}`;
+        }
+        const ay = a.offsetTop + h / 2, s = down ? 1 : -1, r = 14;
+        // Ralliement : horizontale sur la voie de départ, puis verticale juste avant la bulle d'arrivée
+        const vx = b.offsetLeft - off;
+        const sx = down ? a.offsetLeft + w - 4 : a.offsetLeft + w - 4;
+        return `M${sx},${ay} L${vx - r},${ay} Q${vx},${ay} ${vx},${ay + s * r} L${vx},${by - s * r} Q${vx},${by} ${vx + r},${by} L${bx},${by}`;
+      }
+      const ax = a.offsetLeft + w * 0.82;
+      const ay = a.offsetTop + h * (down ? 0.86 : 0.14);
+      const mid = ax + (bx - ax) * 0.45;
+      return `M${ax},${ay} C${ax + 6},${by + (down ? -12 : 12)} ${ax + 20},${by} ${mid},${by} L${bx},${by}`;
+    }
+
+    function drawWire() {
+      wire.setAttribute('d', '');
+      const svg = wire.parentNode;
+      const keep = new Set();
+      steps.forEach(a => {
+        if (a.hidden) return;
+        kids.get(a.dataset.id).forEach(k => {
+          const b = byId.get(k);
+          if (b.hidden) return;
+          const key = a.dataset.id + '>' + k;
+          keep.add(key);
+          let p = svg.querySelector(`[data-edge="${key}"]`);
+          if (!p) {
+            p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            p.dataset.edge = key;
+            p.addEventListener('animationend', () => { p.classList.remove('new'); p.style.strokeDasharray = ''; });
+            svg.appendChild(p);
+          }
+          p.setAttribute('d', edgePath(a, b));
+          if (newEdges.has(key)) {
+            newEdges.delete(key);
+            if (!reduce) {
+              const len = p.getTotalLength();
+              p.style.strokeDasharray = len;
+              p.style.setProperty('--len', len);
+              p.classList.remove('new'); void p.offsetWidth; p.classList.add('new');
+            }
+          }
+        });
+      });
+      svg.querySelectorAll('[data-edge]').forEach(p => { if (!keep.has(p.dataset.edge)) p.remove(); });
+    }
+
+    // Barre de défilement personnalisée
+    const bar = document.getElementById('bar');
+    const thumb = document.getElementById('thumb');
+    const prev = document.getElementById('prev');
+    const next = document.getElementById('next');
+
+    function updateBar() {
+      const max = scroller.scrollWidth - scroller.clientWidth;
+      const ratio = scroller.clientWidth / scroller.scrollWidth;
+      const barW = bar.clientWidth;
+      const thumbW = Math.max(40, barW * ratio);
+      const pos = max > 0 ? scroller.scrollLeft / max : 0;
+      thumb.style.width = thumbW + 'px';
+      thumb.style.left = (barW - thumbW) * pos + 'px';
+      bar.setAttribute('aria-valuenow', Math.round(pos * 100));
+      prev.disabled = scroller.scrollLeft <= 1;
+      next.disabled = scroller.scrollLeft >= max - 1;
+    }
+    scroller.addEventListener('scroll', updateBar, { passive: true });
+
+    function scrollToRatio(r) {
+      const max = scroller.scrollWidth - scroller.clientWidth;
+      scroller.scrollLeft = Math.min(1, Math.max(0, r)) * max;
+    }
+
+    let drag = null;
+    bar.addEventListener('pointerdown', e => {
+      const rect = bar.getBoundingClientRect();
+      const thumbRect = thumb.getBoundingClientRect();
+      const onThumb = e.clientX >= thumbRect.left && e.clientX <= thumbRect.right;
+      const grabOffset = onThumb ? e.clientX - thumbRect.left : thumbRect.width / 2;
+      drag = { rect, grabOffset, thumbW: thumbRect.width };
+      bar.classList.add('dragging');
+      bar.setPointerCapture(e.pointerId);
+      move(e);
+    });
+    function move(e) {
+      if (!drag) return;
+      const free = drag.rect.width - drag.thumbW;
+      scrollToRatio(free > 0 ? (e.clientX - drag.rect.left - drag.grabOffset) / free : 0);
+    }
+    bar.addEventListener('pointermove', move);
+    const end = () => { drag = null; bar.classList.remove('dragging'); };
+    bar.addEventListener('pointerup', end);
+    bar.addEventListener('pointercancel', end);
+
+    const stepBy = dir => scroller.scrollBy({ left: dir * scroller.clientWidth * 0.6, behavior: reduce ? 'auto' : 'smooth' });
+    prev.addEventListener('click', () => stepBy(-1));
+    next.addEventListener('click', () => stepBy(1));
+    bar.addEventListener('keydown', e => {
+      if (e.key === 'ArrowRight') { stepBy(1); e.preventDefault(); }
+      if (e.key === 'ArrowLeft') { stepBy(-1); e.preventDefault(); }
+      if (e.key === 'Home') { scrollToRatio(0); e.preventDefault(); }
+      if (e.key === 'End') { scrollToRatio(1); e.preventDefault(); }
+    });
+
+    // Molette verticale → défilement horizontal dans la frise
+    scroller.addEventListener('wheel', e => {
+      // Ctrl / Cmd + molette (ou pincement sur pavé tactile) : zoom centré sur le curseur
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        setZoom(z * Math.exp(-e.deltaY * 0.0025), e.clientX - scroller.getBoundingClientRect().left);
+        return;
+      }
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      const max = scroller.scrollWidth - scroller.clientWidth;
+      const atStart = scroller.scrollLeft <= 0 && e.deltaY < 0;
+      const atEnd = scroller.scrollLeft >= max - 1 && e.deltaY > 0;
+      if (max <= 0 || atStart || atEnd) return;
+      scroller.scrollLeft += e.deltaY;
+      e.preventDefault();
+    }, { passive: false });
+
+    // ---- Zoom
+    const ZMIN = 0.35, ZMAX = 1.6;
+    const zoomOut = document.getElementById('zoom-out');
+    const zoomIn = document.getElementById('zoom-in');
+    const zoomReset = document.getElementById('zoom-reset');
+    function fitBox() {
+      zoomBox.style.width = timeline.offsetWidth * z + 'px';
+      zoomBox.style.height = timeline.offsetHeight * z + 'px';
+    }
+    // anchor = position (px) dans la zone visible qui reste fixe pendant le zoom
+    function setZoom(next, anchor = scroller.clientWidth / 2) {
+      next = Math.min(ZMAX, Math.max(ZMIN, next));
+      if (Math.abs(next - z) < 0.001) return;
+      const contentX = (scroller.scrollLeft + anchor) / z;
+      z = next;
+      timeline.style.setProperty('--z', z);
+      sizeTimeline();
+      fitBox();
+      scroller.scrollLeft = contentX * z - anchor;
+      zoomReset.textContent = Math.round(z * 100) + ' %';
+      zoomOut.disabled = z <= ZMIN + 0.001;
+      zoomIn.disabled = z >= ZMAX - 0.001;
+      updateBar();
+    }
+    zoomOut.addEventListener('click', () => setZoom(z / 1.25));
+    zoomIn.addEventListener('click', () => setZoom(z * 1.25));
+    zoomReset.addEventListener('click', () => setZoom(1));
+    scroller.addEventListener('keydown', e => {
+      if (e.key === '+' || e.key === '=') { setZoom(z * 1.25); e.preventDefault(); }
+      if (e.key === '-' || e.key === '_') { setZoom(z / 1.25); e.preventDefault(); }
+      if (e.key === '0') { setZoom(1); e.preventDefault(); }
+    });
+    // La frise change de taille (nouvelles bulles, nouvelle branche) : la boîte zoomée suit
+    if ('ResizeObserver' in window) new ResizeObserver(() => { fitBox(); updateBar(); }).observe(timeline);
+    timeline.addEventListener('transitionend', () => { fitBox(); updateBar(); });
+
+    function layout() { sizeTimeline(); fitBox(); drawWire(); updateBar(); }
+    layout();
+
+    // ---- Fenêtre « En savoir plus »
+    // Contenu détaillé : un <div class="more" hidden>...</div> dans la bulle ; sinon texte provisoire.
+    const stage = document.getElementById('stage');
+    const panel = document.getElementById('panel');
+    const panelDate = document.getElementById('panel-date');
+    const panelLabel = document.getElementById('panel-label');
+    const panelBody = document.getElementById('panel-body');
+    const panelClose = document.getElementById('panel-close');
+    const LOREM = [
+      'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed non risus. Suspendisse lectus tortor, dignissim sit amet, adipiscing nec, ultricies sed, dolor. Cras elementum ultrices diam. Maecenas ligula massa, varius a, semper congue, euismod non, mi.',
+      'Proin porttitor, orci nec nonummy molestie, enim est eleifend mi, non fermentum diam nisl sit amet erat. Duis semper. Duis arcu massa, scelerisque vitae, consequat in, pretium a, enim. Pellentesque congue. Ut in risus volutpat libero pharetra tempor.',
+      'Cras vestibulum bibendum augue. Praesent egestas leo in pede. Praesent blandit odio eu enim. Pellentesque sed dui ut augue blandit sodales. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia curae; aliquam nibh.',
+      'Mauris ac mauris sed pede pellentesque fermentum. Maecenas adipiscing ante non diam sodales hendrerit. Ut velit mauris, egestas sed, gravida nec, ornare ut, mi. Aenean ut orci vel massa suscipit pulvinar. Nulla sollicitudin.'
+    ];
+    let opener = null, closeTimer = null;
+
+    function openPanel(step, btn) {
+      clearTimeout(closeTimer);
+      opener = btn;
+      panelDate.textContent = step.querySelector('.date').textContent.trim();
+      panelLabel.textContent = step.querySelector('.label').textContent.trim();
+      const custom = step.querySelector('.more');
+      panelBody.innerHTML = custom ? custom.innerHTML : LOREM.map(t => '<p>' + t + '</p>').join('');
+      stage.classList.add('panel-open');
+      panel.hidden = false;
+      panel.querySelector('.panel-inner').scrollTop = 0;
+      void panel.offsetWidth;
+      panel.classList.add('is-open');
+      const top = stage.getBoundingClientRect().top;
+      if (top < 0) window.scrollBy({ top: top - 16, behavior: reduce ? 'auto' : 'smooth' });
+      panelClose.focus({ preventScroll: true });
+    }
+    function closePanel() {
+      if (panel.hidden) return;
+      panel.classList.remove('is-open');
+      closeTimer = setTimeout(() => { panel.hidden = true; stage.classList.remove('panel-open'); }, reduce ? 0 : 400);
+      if (opener) opener.focus({ preventScroll: true });
+    }
+    steps.forEach(step => {
+      const box = step.querySelector('.text > div');
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'more-btn';
+      btn.textContent = 'Détail'; //\u2192';
+      btn.setAttribute('aria-controls', 'panel');
+      btn.addEventListener('click', () => openPanel(step, btn));
+      box.appendChild(btn);
+    });
+    panelClose.addEventListener('click', closePanel);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closePanel(); });
+    window.addEventListener('resize', layout);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(layout);
+  })();
+</script>
+</body>
+</html>
